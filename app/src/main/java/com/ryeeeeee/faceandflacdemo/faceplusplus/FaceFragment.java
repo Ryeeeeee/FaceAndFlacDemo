@@ -52,7 +52,7 @@ public class FaceFragment extends Fragment implements View.OnClickListener {
     private Button mSelectButton;
     private Context mContext;
     private Bitmap mPicture;
-    private String mImagePath;
+    private File mFile;
 
     private Retrofit mRetrofit;
     private DetectionApi mDetectionApi;
@@ -127,18 +127,24 @@ public class FaceFragment extends Fragment implements View.OnClickListener {
         switch (requestCode) {
             case REQUEST_CODE_PICTURE_PICK:
                 if (data != null) {
-                    mImagePath = FileUtil.getPathFromUri(mContext, data.getData());
-                    if (mImagePath != null) {
-                        mPicture = ImageUtil.decodeSampledBitmapFromPath(mImagePath, mImageView.getWidth(),
-                                mImageView.getHeight());
-                        mImageView.setImageBitmap(mPicture);
-                        new DetectThread().start();
-                        return;
+                    String imagePath = FileUtil.getPathFromUri(mContext, data.getData());
+                    if (imagePath != null) {
+                        mFile = new File(imagePath);
+                        if (mFile.length() <= 1024 * 1024) {
+                            mPicture = ImageUtil.decodeSampledBitmapFromPath(imagePath, mImageView.getWidth(), mImageView.getHeight());
+                            mImageView.setImageBitmap(mPicture);
+                            new DetectThread().start();
+                            Toast.makeText(mContext.getApplicationContext(), R.string.wait_for_processing_picture, Toast.LENGTH_SHORT).show();
+                            return;
+                        } else {
+                            Toast.makeText(mContext.getApplicationContext(), R.string.file_size_must_be_less_than_1MB,
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
                     }
-                    Toast.makeText(mContext.getApplicationContext(), R.string.failed_to_select_picture,
-                            Toast.LENGTH_SHORT).show();
                 }
-                break;
+                Toast.makeText(mContext.getApplicationContext(), R.string.failed_to_select_picture, Toast.LENGTH_SHORT).show();
+
             default:
         }
     }
@@ -195,10 +201,9 @@ public class FaceFragment extends Fragment implements View.OnClickListener {
     private class DetectThread extends Thread {
         @Override
         public void run() {
-            File file = new File(mImagePath);
             RequestBody apiKeyBody = RequestBody.create(MediaType.parse("text/plain"), API_KEY);
             RequestBody apiSecretBody = RequestBody.create(MediaType.parse("text/plain"), API_SECRET);
-            RequestBody requestBody = RequestBody.create(MediaType.parse("image/*"), file);
+            RequestBody requestBody = RequestBody.create(MediaType.parse("image/*"), mFile);
             Call<DetectionResult> call = mDetectionApi.detect(apiKeyBody, apiSecretBody, requestBody);
             String errorMessage = null;
             try {
